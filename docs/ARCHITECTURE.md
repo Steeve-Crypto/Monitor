@@ -1,7 +1,7 @@
 # Monitor — Architecture
 
 **Status**: Detailed design. Must stay aligned with [SOURCE_OF_TRUTH.md](SOURCE_OF_TRUTH.md).  
-**Last Updated**: 2026-06-11  
+**Last Updated**: 2026-06-12  
 **Version**: 0.1.0
 
 ## 1. System Overview
@@ -24,6 +24,7 @@ The architecture prioritizes:
   - Whitelisted Platforms configuration.
 - **Access**: Only through Vault Manager module. Never passed raw to LLMs.
 - **Backup**: Operator-controlled encrypted exports.
+- **Current Baseline**: Local encrypted profile vault uses password-derived Fernet encryption for `Profile` records and exposes profile APIs guarded by `X-Vault-Password`. Keyring integration, credential sub-vault, and encrypted export/backup remain pending.
 
 ### 2.2 Signal & Opportunity Mesh Scanner
 - **Social Signal Layer**: X API/Grok search for buying-intent posts, founder/project hiring signals, web3 bounty mentions, urgent Python automation needs, and DM-worthy threads. Discord bot/API monitors approved servers/channels for gig posts, grant/bounty leads, project launches, and hiring requests.
@@ -47,6 +48,7 @@ The architecture prioritizes:
 Hermes Agent runs persistently and manages:
 - **Scout Skill**: Ingests opportunities/signals → scores against Profile using local model or Grok for X-native public context → produces ranked list.
 - **Qualifier Skill**: Filters for Python/web3 fit, budget quality, buyer intent, scam risk, urgency, likelihood of response, and whether the opportunity is worth outreach.
+- **Current Qualifier Baseline**: Deterministic local scoring computes Python fit, web3 fit, buyer intent, budget quality, urgency, scam risk, response likelihood, target-fit, and aggregate qualification score. Hermes/local-model/Grok-backed skill execution remains pending.
 - **Tailor Skill**: Takes ranked opportunity + Profile → generates tailored proposal, bid, DM, email, or resume slice. Hermes improves this skill from historical response/win rates.
 - **Executor Skill**: Prepares action payload → asks Risk, Approval & Autopilot Policy Service whether approval is required or an autopilot policy applies → performs low-risk local actions directly and executes reputation-risk external actions only after approval or matching scoped autopilot policy.
 - **Reflector Skill** (Hermes-native loop): Periodically or on trigger:
@@ -98,7 +100,7 @@ Skills are stored as versioned files/modules that Hermes loads and can modify.
 Full Pydantic models defined in code (see tasks MON-006).
 
 ## 4. Key Flows
-1. **Signal Discovery Flow**: X/Discord/marketplace/crypto board scanners → ProjectSignal/Opportunity normalization → dedupe + semantic memory → Scout/Qualifier Skills → ranked opportunities presented in deck.
+1. **Signal Discovery Flow**: X/Discord/marketplace/crypto board scanners → ProjectSignal/Opportunity normalization → store-level dedupe → deterministic qualification/scoring baseline → future semantic/vector memory + Hermes Scout/Qualifier Skills → ranked opportunities presented in deck.
    - Current live-safe path: `crypto_rss` → RSS item parsing → query keyword filtering → `ProjectSignal` normalization → store-level dedupe/persistence.
 2. **Application/Outreach Flow**: Select or auto-qualify opportunity → Tailor Skill → Risk Classification → Approval Cockpit or scoped Autopilot policy → Executor Skill.
 3. **Evolution Flow**: After outcome data → Reflector Skill → Updated skill files + improved future performance.

@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { fetchApiHealth, sourceStatuses } from './monitor';
+import {
+  fetchApiHealth,
+  fetchOpportunities,
+  fetchSignals,
+  fetchStoreStats,
+  runScan,
+  sourceStatuses
+} from './monitor';
 
 describe('fetchApiHealth', () => {
   it('returns typed health JSON when the API responds successfully', async () => {
@@ -21,6 +28,122 @@ describe('fetchApiHealth', () => {
 
     await expect(fetchApiHealth(fetcher as typeof fetch)).rejects.toThrow(
       'Monitor API health check failed: 503'
+    );
+  });
+});
+
+describe('fetchStoreStats', () => {
+  it('returns typed store stats JSON when the API responds successfully', async () => {
+    const stats = {
+      signals_count: 12,
+      opportunities_count: 4,
+      storage_path: '.monitor/signal_mesh_store.json',
+      storage_exists: true
+    };
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(stats), { status: 200 }));
+
+    await expect(fetchStoreStats(fetcher as unknown as typeof fetch)).resolves.toEqual(stats);
+    expect(fetcher).toHaveBeenCalledWith('/api/store/stats');
+  });
+
+  it('raises an actionable error when stats fail', async () => {
+    const fetcher = async () => new Response('missing', { status: 500 });
+
+    await expect(fetchStoreStats(fetcher as typeof fetch)).rejects.toThrow(
+      'Monitor API store stats fetch failed: 500'
+    );
+  });
+});
+
+describe('fetchSignals', () => {
+  it('returns the typed signal list response', async () => {
+    const payload = {
+      items: [
+        {
+          id: 'sig_1',
+          source_platform: 'rss',
+          source_id: 'rss-1',
+          source_url: 'https://example.com/job',
+          title: 'Python web3 dashboard',
+          raw_text: 'Need Python web3 dashboard automation',
+          signal_kind: 'hiring',
+          status: 'new',
+          detected_keywords: ['python', 'web3'],
+          project_name: null,
+          budget_hint: '$2k',
+          contact_route: 'application_form',
+          risk_level: 'low',
+          captured_at: '2026-06-12T00:00:00Z'
+        }
+      ],
+      count: 1
+    };
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 }));
+
+    await expect(fetchSignals(fetcher as unknown as typeof fetch)).resolves.toEqual(payload);
+    expect(fetcher).toHaveBeenCalledWith('/api/signals');
+  });
+});
+
+describe('fetchOpportunities', () => {
+  it('returns the typed opportunity list response', async () => {
+    const payload = {
+      items: [
+        {
+          id: 'opp_1',
+          source_signal_id: 'sig_1',
+          source_platform: 'upwork',
+          source_id: 'upwork-1',
+          source_url: null,
+          title: 'Automation build',
+          description: 'Build an automation dashboard',
+          required_skills: ['python'],
+          budget_min: 500,
+          budget_max: 1500,
+          currency: 'USD',
+          contact_route: 'platform_proposal',
+          status: 'qualified',
+          python_fit_score: 0.9,
+          web3_fit_score: 0.4,
+          buyer_intent_score: 0.8,
+          budget_quality_score: 0.7,
+          urgency_score: 0.5,
+          response_likelihood_score: 0.6,
+          scam_risk_score: 0.1,
+          qualification_score: 0.795,
+          is_target_fit: true,
+          created_at: '2026-06-12T00:00:00Z'
+        }
+      ],
+      count: 1
+    };
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 }));
+
+    await expect(fetchOpportunities(fetcher as unknown as typeof fetch)).resolves.toEqual(payload);
+    expect(fetcher).toHaveBeenCalledWith('/api/opportunities');
+  });
+});
+
+describe('runScan', () => {
+  it('posts source, query, and limit to the scan endpoint', async () => {
+    const payload = { source: 'crypto_rss', items: [], count: 0 };
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 }));
+
+    await expect(runScan('crypto_rss', 'python web3', 7, fetcher as unknown as typeof fetch)).resolves.toEqual(
+      payload
+    );
+    expect(fetcher).toHaveBeenCalledWith('/api/scans/crypto_rss/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: 'python web3', limit: 7 })
+    });
+  });
+
+  it('raises an actionable error when a scan fails', async () => {
+    const fetcher = async () => new Response('bad source', { status: 404 });
+
+    await expect(runScan('crypto_rss', 'python web3', 10, fetcher as typeof fetch)).rejects.toThrow(
+      'Monitor API scan failed for crypto_rss: 404'
     );
   });
 });

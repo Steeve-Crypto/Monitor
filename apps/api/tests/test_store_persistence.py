@@ -91,29 +91,33 @@ def test_api_persists_created_opportunity_across_app_instances(tmp_path):
     assert list_response.json()["items"][0]["source_id"] == "job-abc"
 
 
-def test_scan_endpoint_persists_scanned_signals_across_app_instances(tmp_path):
+def test_scan_endpoint_does_not_persist_unconfigured_fake_signals(tmp_path):
     storage_path = tmp_path / "signal_mesh.json"
-    first_client = TestClient(create_app(storage_path=storage_path))
+    client = TestClient(create_app(storage_path=storage_path))
 
-    scan_response = first_client.post(
+    scan_response = client.post(
         "/api/scans/x/run",
         json={"query": "need python web3 dashboard", "limit": 2},
     )
 
-    assert scan_response.status_code == 200
+    assert scan_response.status_code == 503
     second_client = TestClient(create_app(storage_path=storage_path))
     list_response = second_client.get("/api/signals")
     assert list_response.status_code == 200
-    assert list_response.json()["count"] == 2
-    assert [item["source_platform"] for item in list_response.json()["items"]] == ["x", "x"]
+    assert list_response.json()["count"] == 0
 
 
 def test_store_stats_endpoint_returns_counts_and_safe_storage_metadata(tmp_path):
     storage_path = tmp_path / "signal_mesh.json"
     client = TestClient(create_app(storage_path=storage_path))
     client.post(
-        "/api/scans/discord/run",
-        json={"query": "python automation", "limit": 1},
+        "/api/signals",
+        json={
+            "source_platform": "rss",
+            "source_id": "job-1",
+            "title": "Need Python automation",
+            "raw_text": "Need Python automation for crypto reporting.",
+        },
     )
 
     response = client.get("/api/store/stats")

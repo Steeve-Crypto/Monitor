@@ -20,6 +20,14 @@ class UnsupportedSignalSourceError(ValueError):
         self.source = source
 
 
+class SourceNotConfiguredError(ValueError):
+    def __init__(self, source: str) -> None:
+        super().__init__(
+            f"Signal source is not configured: {source}. Configure a live adapter before scanning."
+        )
+        self.source = source
+
+
 class SignalAdapter:
     source: str
     platform: Platform
@@ -29,76 +37,32 @@ class SignalAdapter:
 
 
 @dataclass(frozen=True)
-class MockSignalAdapter(SignalAdapter):
-    source: str = "mock"
-    platform: Platform = Platform.OTHER
-    signal_kind: SignalKind = SignalKind.OTHER
-    contact_route: ContactRoute = ContactRoute.NONE
-    risk_level: RiskLevel = RiskLevel.LOW
+class NotConfiguredSignalAdapter(SignalAdapter):
+    source: str
+    platform: Platform
 
     def scan(self, query: str, limit: int = 10) -> list[ProjectSignal]:
-        normalized_limit = normalize_limit(limit)
-        keywords = _extract_keywords(query)
-        return [
-            ProjectSignal(
-                source_platform=self.platform,
-                source_id=f"{self.source}-{index + 1}",
-                title=f"{query} lead #{index + 1}",
-                raw_text=(
-                    f"Mock {self.source} signal for '{query}'. "
-                    "Potential Python/web3 project opportunity."
-                ),
-                signal_kind=self.signal_kind,
-                detected_keywords=keywords,
-                contact_route=self.contact_route,
-                risk_level=self.risk_level,
-            )
-            for index in range(normalized_limit)
-        ]
+        raise SourceNotConfiguredError(self.source)
 
 
-class XSignalAdapter(MockSignalAdapter):
+class XSignalAdapter(NotConfiguredSignalAdapter):
     def __init__(self) -> None:
-        super().__init__(
-            source="x",
-            platform=Platform.X,
-            signal_kind=SignalKind.BUYING_INTENT,
-            contact_route=ContactRoute.PUBLIC_REPLY,
-            risk_level=RiskLevel.LOW,
-        )
+        super().__init__(source="x", platform=Platform.X)
 
 
-class DiscordSignalAdapter(MockSignalAdapter):
+class DiscordSignalAdapter(NotConfiguredSignalAdapter):
     def __init__(self) -> None:
-        super().__init__(
-            source="discord",
-            platform=Platform.DISCORD,
-            signal_kind=SignalKind.HIRING,
-            contact_route=ContactRoute.DISCORD_CHANNEL,
-            risk_level=RiskLevel.LOW,
-        )
+        super().__init__(source="discord", platform=Platform.DISCORD)
 
 
-class MarketplaceSignalAdapter(MockSignalAdapter):
+class MarketplaceSignalAdapter(NotConfiguredSignalAdapter):
     def __init__(self) -> None:
-        super().__init__(
-            source="marketplaces",
-            platform=Platform.UPWORK,
-            signal_kind=SignalKind.HIRING,
-            contact_route=ContactRoute.PLATFORM_PROPOSAL,
-            risk_level=RiskLevel.MEDIUM,
-        )
+        super().__init__(source="marketplaces", platform=Platform.UPWORK)
 
 
-class CryptoSignalAdapter(MockSignalAdapter):
+class CryptoSignalAdapter(NotConfiguredSignalAdapter):
     def __init__(self) -> None:
-        super().__init__(
-            source="crypto",
-            platform=Platform.WEB3_CAREER,
-            signal_kind=SignalKind.BOUNTY,
-            contact_route=ContactRoute.APPLICATION_FORM,
-            risk_level=RiskLevel.LOW,
-        )
+        super().__init__(source="crypto", platform=Platform.WEB3_CAREER)
 
 
 @dataclass(frozen=True)
@@ -115,7 +79,7 @@ class CryptoRssSignalAdapter(SignalAdapter):
     def scan(self, query: str, limit: int = 10) -> list[ProjectSignal]:
         feed_url = self.feed_url or os.getenv(CRYPTO_RSS_FEED_URL_ENV)
         if not feed_url:
-            return []
+            raise SourceNotConfiguredError(self.source)
 
         query_keywords = _extract_keywords(query)
         raw_feed = self.fetch_feed(feed_url)

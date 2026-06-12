@@ -16,13 +16,19 @@ STORAGE_PATH_ENV = "MONITOR_SIGNAL_MESH_STORE_PATH"
 class SignalMeshStore(Protocol):
     def list_signals(self) -> list[ProjectSignal]: ...
 
+    def get_signal(self, signal_id: str) -> ProjectSignal | None: ...
+
     def add_signal(self, signal: ProjectSignal) -> ProjectSignal: ...
 
     def add_signals(self, signals: list[ProjectSignal]) -> list[ProjectSignal]: ...
 
     def list_opportunities(self) -> list[Opportunity]: ...
 
+    def get_opportunity_by_source_signal_id(self, signal_id: str) -> Opportunity | None: ...
+
     def add_opportunity(self, opportunity: Opportunity) -> Opportunity: ...
+
+    def update_signal(self, signal: ProjectSignal) -> ProjectSignal: ...
 
     def stats(self) -> dict[str, object]: ...
 
@@ -40,6 +46,10 @@ class JsonSignalMeshStore:
     def list_signals(self) -> list[ProjectSignal]:
         with self._lock:
             return list(self._signals)
+
+    def get_signal(self, signal_id: str) -> ProjectSignal | None:
+        with self._lock:
+            return next((signal for signal in self._signals if signal.id == signal_id), None)
 
     def add_signal(self, signal: ProjectSignal) -> ProjectSignal:
         with self._lock:
@@ -68,11 +78,31 @@ class JsonSignalMeshStore:
         with self._lock:
             return list(self._opportunities)
 
+    def get_opportunity_by_source_signal_id(self, signal_id: str) -> Opportunity | None:
+        with self._lock:
+            return next(
+                (
+                    opportunity
+                    for opportunity in self._opportunities
+                    if opportunity.source_signal_id == signal_id
+                ),
+                None,
+            )
+
     def add_opportunity(self, opportunity: Opportunity) -> Opportunity:
         with self._lock:
             self._opportunities.append(opportunity)
             self._save()
         return opportunity
+
+    def update_signal(self, signal: ProjectSignal) -> ProjectSignal:
+        with self._lock:
+            for index, existing in enumerate(self._signals):
+                if existing.id == signal.id:
+                    self._signals[index] = signal
+                    self._save()
+                    return signal
+        return signal
 
     def stats(self) -> dict[str, object]:
         with self._lock:

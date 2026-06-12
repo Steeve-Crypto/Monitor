@@ -17,17 +17,21 @@ A neural extension of your agency that operates 24/7 across the gig, crypto, and
 - **Revenue Aligned**: Primary goal is landing Python, AI automation, and web3 gigs/contracts from marketplaces, crypto ecosystems, and high-signal social/community channels. Secondary: productize as premium tooling.
 
 ## Current Status
-- Phase 2 baseline in progress: FastAPI backend, Pydantic contracts, mock Signal Mesh adapters, JSON-backed persistent signal/opportunity store, and Tauri-ready Svelte command deck are operational. Encrypted Identity Vault and live source credentials are still pending.
+- Phase 2 baseline in progress: FastAPI backend, Pydantic contracts, encrypted local profile vault, deterministic opportunity qualification, live-safe crypto RSS ingestion, JSON-backed persistent signal/opportunity store, and Tauri-ready Svelte command deck with scan/stats/signal/opportunity UI are operational. X, Discord, marketplace, and board-specific crypto sources are disabled until real live adapters/credentials are configured; no fake/demo signal generation is used. Semantic/vector memory, Tailor, Approval Cockpit, and executor/autopilot sends are still pending.
 
 ## Implemented API Baseline
 - `GET /api/health`
+- `GET /api/profiles` / `POST /api/profiles` / `GET /api/profiles/{profile_id}` with `X-Vault-Password`
 - `GET /api/signals` / `POST /api/signals`
+- `POST /api/signals/{signal_id}/qualify`
 - `GET /api/opportunities` / `POST /api/opportunities`
-- `POST /api/scans/{source}/run` for `x`, `discord`, `marketplaces`, and `crypto` mock adapters
+- `POST /api/scans/{source}/run` rejects unconfigured sources with 503 instead of generating fake data
 - `POST /api/scans/crypto_rss/run` for live-safe public RSS/HTTP crypto job-board ingestion
 - `GET /api/store/stats`
 - Default local store: `.monitor/signal_mesh_store.json` (`MONITOR_SIGNAL_MESH_STORE_PATH` can override)
 - Optional live crypto RSS feed: set `MONITOR_CRYPTO_RSS_FEED_URL` to a public `http` or `https` RSS URL before starting `apps/api`
+- Default encrypted profile vault: `.monitor/profile_vault.json` (`MONITOR_PROFILE_VAULT_PATH` can override)
+- Qualification is currently deterministic/local and safe for low-risk internal scoring; external sends/submissions remain disabled until Tailor + Approval Cockpit + audit gates are implemented.
 
 ## Quick Start (Planned)
 ```bash

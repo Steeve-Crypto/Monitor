@@ -1,7 +1,7 @@
 # Monitor — Source of Truth
 
 **Status**: Authoritative. All other documents and code must reference or derive from this file.  
-**Last Updated**: 2026-06-11  
+**Last Updated**: 2026-06-12  
 **Version**: 0.1.0 
 
 ## 1. Purpose & Scope
@@ -45,7 +45,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for full details. High-level components:
 **Data Flow (Simplified)**:
 Profile Vault → Signal/Opportunity Scanner → Dedupe + Semantic Memory → Hermes Scout/Qualifier Skill → Ranked Python/web3 opportunities → Hermes Tailor Skill → Personalized proposal/DM/email artifacts → Risk Classification → Approval Cockpit or scoped Autopilot policy → Hermes Executor Skill → Submission/Outreach/Local Update + Logging → Hermes Reflector Skill (periodic evolution).
 
-**Current Implementation Baseline**: FastAPI exposes `/api/health`, `/api/signals`, `/api/opportunities`, `/api/scans/{source}/run`, and `/api/store/stats`. X, Discord, marketplace, and generic crypto adapters currently use deterministic mock output behind stable contracts. The `crypto_rss` source can ingest an operator-configured public `http`/`https` RSS feed via `MONITOR_CRYPTO_RSS_FEED_URL` and persists only new signals by source platform + source id.
+**Current Implementation Baseline**: FastAPI exposes `/api/health`, encrypted profile vault APIs, `/api/signals`, `/api/opportunities`, `/api/scans/{source}/run`, `/api/signals/{signal_id}/qualify`, and `/api/store/stats`. X, Discord, marketplace, and generic crypto sources are disabled until real live adapters/credentials are configured; unconfigured scans return 503 and never generate fake/demo leads. The `crypto_rss` source can ingest an operator-configured public `http`/`https` RSS feed via `MONITOR_CRYPTO_RSS_FEED_URL`. The local store persists normalized signals/opportunities, dedupes signals by source platform + source id, and persists deterministic qualification scores. Semantic/vector memory and live platform credential integrations remain pending.
 
 ## 3. Key Decisions & Constraints
 - **Hermes Integration**: Primary runtime. We extend Hermes with custom persistent skills rather than building a parallel agent framework from scratch.
@@ -68,7 +68,7 @@ Profile Vault → Signal/Opportunity Scanner → Dedupe + Semantic Memory → He
 Any modification to scope, architecture, safety model, or Hermes integration **must** be reflected in this Source of Truth first, then propagated to dependent documents and code.
 
 **Current Phase**: Phase 2 — Signal Discovery & Persistent Signal Mesh  
-**Next Milestone**: Add richer live crypto source presets and dedupe/semantic scoring, then Discord and X/Grok integrations behind platform-safe credential gates.
+**Next Milestone**: Complete opportunity dedupe + semantic/vector memory, add richer crypto source presets, then implement Tailor + Approval Cockpit before enabling any executor/autopilot sends. Live Discord and X/Grok integrations remain behind platform-safe credential gates.
 
 ---
 

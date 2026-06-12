@@ -1,7 +1,7 @@
 # Security & Operational Model
 
 **Status**: Foundational. Must be followed for all credential and action handling.  
-**Last Updated**: 2026-06-11
+**Last Updated**: 2026-06-12
 
 ## 1. Core Security Posture
 The operator’s credentials, professional identity, and decision authority never leave their control.
@@ -16,6 +16,7 @@ The operator’s credentials, professional identity, and decision authority neve
 - **Access Pattern**: Vault is unlocked in-memory only during an approved session or specific approved action. Decrypted data is never written back to disk in plaintext.
 - **Key Management**: Operator-controlled master key. No cloud key escrow.
 - **Schema**: Clear separation between public profile data (skills, bio) and encrypted credential store.
+- **Current Baseline**: Profile records are stored in a local encrypted profile vault (`.monitor/profile_vault.json` by default, override with `MONITOR_PROFILE_VAULT_PATH`) using password-derived Fernet encryption. Profile APIs require `X-Vault-Password`; credential sub-vault, OS keyring integration, and encrypted backup/export remain pending.
 
 ## 3. LLM Usage Rules
 - **Local LLM Default**: All operations involving resume content, personal bio, or tailored materials use local models via Ollama first.

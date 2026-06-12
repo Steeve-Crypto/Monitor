@@ -4,7 +4,7 @@
 
 **Goal:** Build Monitor as a local-first full-stack command deck that scrapes/monitors authorized X, Discord, marketplace, and crypto job-board sources for project signals and paid gigs; filters for Python, AI automation, and web3 work; drafts personalized proposals/DMs/emails with local LLM or Grok; and executes approved or policy-authorized applications/outreach with full auditability.
 
-**Architecture:** A desktop-first full-stack app: Tauri shell + Svelte/Vite frontend + Three.js visualization layer, backed by a local Python FastAPI service for vault, signal scanners, marketplace adapters, Hermes skill orchestration, risk/autopilot policy enforcement, persistence, and audit logging. The app is offline-capable for private data, stores sensitive data locally, and uses explicit risk classification plus scoped autopilot policies to decide whether an action needs human approval or can execute automatically.
+**Architecture:** A desktop-first full-stack app: Tauri shell + Svelte/Vite frontend + Three.js visualization layer, backed by a local Python FastAPI service for vault, signal scanners, marketplace adapters, deterministic qualification, Hermes skill orchestration, risk/autopilot policy enforcement, persistence, and audit logging. The app is offline-capable for private data, stores sensitive data locally, and uses explicit risk classification plus scoped autopilot policies to decide whether an action needs human approval or can execute automatically.
 
 **Tech Stack:** Tauri, Svelte/Vite, TypeScript, Three.js, Python 3.12, FastAPI, Pydantic v2, JSON-backed local store now, SQLModel/SQLAlchemy + SQLite/PostgreSQL later, vector index (sqlite-vss/LanceDB/Qdrant local), cryptography, keyring, Playwright for whitelisted workflows, X API + Grok API, Discord bot/API, RSS/email ingestion, Ollama, Hermes Agent.
 
@@ -203,23 +203,27 @@ Responsibilities:
 
 ## 6. Frontend Data Contracts
 
-Initial API routes:
+Implemented API routes:
 
 - `GET /api/health`
-- `POST /api/vault/unlock`
-- `POST /api/vault/lock`
-- `GET /api/profile`
-- `PUT /api/profile`
-- `GET /api/signals`
-- `GET /api/opportunities`
+- `GET /api/profiles`, `POST /api/profiles`, `GET /api/profiles/{profile_id}` with `X-Vault-Password`
+- `GET /api/signals`, `POST /api/signals`
+- `POST /api/signals/{signal_id}/qualify`
+- `GET /api/opportunities`, `POST /api/opportunities`
 - `GET /api/store/stats`
-- `POST /api/scans/run`
 - `POST /api/scans/x/run`
 - `POST /api/scans/discord/run`
 - `POST /api/scans/marketplaces/run`
 - `POST /api/scans/crypto/run`
 - `POST /api/scans/crypto_rss/run`
-- `POST /api/opportunities/{id}/qualify`
+
+Planned API routes:
+
+- `POST /api/vault/unlock`
+- `POST /api/vault/lock`
+- `GET /api/profile`
+- `PUT /api/profile`
+- `POST /api/scans/run`
 - `POST /api/opportunities/{id}/rank`
 - `POST /api/opportunities/{id}/tailor`
 - `POST /api/actions/propose`
