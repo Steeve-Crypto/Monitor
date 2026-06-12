@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException, Response, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from monitor_api import __version__
@@ -135,6 +136,17 @@ def create_app(
             "Local API for Monitor signal discovery, qualification, "
             "and risk/autopilot contracts."
         ),
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://127.0.0.1:5173",
+            "http://localhost:5173",
+            "http://127.0.0.1:4173",
+            "http://localhost:4173",
+        ],
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
     signal_store = store if store is not None else JsonSignalMeshStore(storage_path)
     profile_vault = ProfileVault(vault_path)

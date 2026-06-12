@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import {
     approveActionProposal,
+    createDraft,
     executeActionProposal,
     fetchActionProposals,
     fetchApiHealth,
@@ -9,15 +10,15 @@
     fetchOpportunities,
     fetchSignals,
     fetchStoreStats,
+    proposeAction,
+    qualifySignal,
     rejectActionProposal,
     runScan,
-    sourceStatuses,
     type ActionProposal,
     type ApiHealth,
     type AuditEvent,
     type Opportunity,
     type ProjectSignal,
-    type SignalSource,
     type StoreStats
   } from '$lib/monitor';
 
@@ -25,36 +26,20 @@
   let stats: StoreStats | null = null;
   let signals: ProjectSignal[] = [];
   let opportunities: Opportunity[] = [];
-  let actionProposals: ActionProposal[] = [];
-  let auditEvents: AuditEvent[] = [];
-  let apiError: string | null = 'Start apps/api to connect live data.';
-  let dataError: string | null = null;
-  let scanError: string | null = null;
-  let scanMessage: string | null = null;
-  let actionError: string | null = null;
-  let actionMessage: string | null = null;
-  let loading = true;
-  let scanning = false;
-  let selectedSource: SignalSource = 'crypto_rss';
-  let scanQuery = 'python web3 automation dashboard';
-  let scanLimit = 10;
+  let proposals: ActionProposal[] = [];
+  let audit: AuditEvent[] = [];
+  let statusLine = 'READY';
+  let busy = false;
 
-  const priorityMissions = [
-    'Run X/Grok buying-intent hunt for Python + web3 dashboard gigs',
-    'Scan approved Discord communities for bounty and grant signals',
-    'Pull Upwork/Fiverr marketplace leads into Signal Mesh',
-    'Qualify leads by stack fit, buyer intent, budget quality, and scam risk'
-  ];
+  $: online = health?.status === 'ok';
+  $: signal = signals[0];
+  $: opportunity = opportunities[0];
+  $: proposal = proposals[0];
 
-  $: latestSignals = signals.slice(0, 6);
-  $: latestOpportunities = opportunities.slice(0, 6);
-  $: selectedSourceStatus = sourceStatuses.find((source) => source.id === selectedSource);
-
-  async function refreshData() {
-    loading = true;
-    dataError = null;
+  async function sync() {
+    busy = true;
     try {
-      const [nextHealth, nextStats, nextSignals, nextOpportunities, nextProposals, nextAudit] = await Promise.all([
+      const [h, st, si, op, pr, au] = await Promise.all([
         fetchApiHealth(),
         fetchStoreStats(),
         fetchSignals(),
@@ -62,315 +47,136 @@
         fetchActionProposals(),
         fetchAuditEvents()
       ]);
-      health = nextHealth;
-      stats = nextStats;
-      signals = nextSignals.items;
-      opportunities = nextOpportunities.items;
-      actionProposals = nextProposals.items;
-      auditEvents = nextAudit.items;
-      apiError = null;
+      health = h;
+      stats = st;
+      signals = si.items;
+      opportunities = op.items;
+      proposals = pr.items;
+      audit = au.items;
+      statusLine = 'SYNCED';
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown Monitor API error';
-      apiError = message;
-      dataError = message;
+      statusLine = error instanceof Error ? error.message : 'API OFFLINE';
     } finally {
-      loading = false;
+      busy = false;
     }
   }
 
-  async function submitScan() {
-    scanning = true;
-    scanError = null;
-    scanMessage = null;
+  async function scan() {
+    busy = true;
     try {
-      const response = await runScan(selectedSource, scanQuery, scanLimit);
-      scanMessage = `Scan complete: ${response.count} new ${response.count === 1 ? 'signal' : 'signals'} captured from ${response.source}.`;
-      await refreshData();
+      const result = await runScan('crypto_rss', 'python web3 automation dashboard', 10);
+      statusLine = result.count ? `SCANNED ${result.count}` : 'NO NEW SIGNALS';
+      await sync();
     } catch (error) {
-      scanError = error instanceof Error ? error.message : 'Unknown scan error';
+      statusLine = error instanceof Error ? error.message : 'SCAN FAILED';
     } finally {
-      scanning = false;
+      busy = false;
     }
   }
 
-  async function handleAction(kind: 'approve' | 'reject' | 'execute', actionId: string) {
-    actionError = null;
-    actionMessage = null;
+  async function qualify() {
+    if (!signal) {
+      statusLine = 'NO SIGNAL';
+      return;
+    }
+    busy = true;
     try {
-      if (kind === 'approve') {
-        await approveActionProposal(actionId);
-        actionMessage = `Approved action ${actionId}.`;
-      } else if (kind === 'reject') {
-        await rejectActionProposal(actionId);
-        actionMessage = `Rejected action ${actionId}.`;
-      } else {
-        await executeActionProposal(actionId);
-        actionMessage = `Executed action ${actionId}.`;
-      }
-      await refreshData();
+      await qualifySignal(signal.id);
+      statusLine = 'QUALIFIED';
+      await sync();
     } catch (error) {
-      actionError = error instanceof Error ? error.message : 'Unknown action error';
+      statusLine = error instanceof Error ? error.message : 'QUALIFY FAILED';
+    } finally {
+      busy = false;
     }
   }
 
-  function formatDate(value: string) {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return value;
+  async function draft() {
+    if (!opportunity) {
+      statusLine = 'NO OPPORTUNITY';
+      return;
     }
-    return new Intl.DateTimeFormat(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
+    busy = true;
+    try {
+      await createDraft(opportunity.id);
+      await proposeAction(opportunity.id);
+      statusLine = 'DRAFTED';
+      await sync();
+    } catch (error) {
+      statusLine = error instanceof Error ? error.message : 'DRAFT FAILED';
+    } finally {
+      busy = false;
+    }
   }
 
-  function formatPercent(value: number | undefined) {
-    if (value === undefined) {
-      return 'n/a';
+  async function action(kind: 'approve' | 'reject' | 'execute') {
+    if (!proposal) {
+      statusLine = 'NO PROPOSAL';
+      return;
     }
-    return `${Math.round(value * 100)}%`;
+    busy = true;
+    try {
+      if (kind === 'approve') await approveActionProposal(proposal.id);
+      if (kind === 'reject') await rejectActionProposal(proposal.id);
+      if (kind === 'execute') await executeActionProposal(proposal.id);
+      statusLine = kind.toUpperCase();
+      await sync();
+    } catch (error) {
+      statusLine = error instanceof Error ? error.message : `${kind.toUpperCase()} FAILED`;
+    } finally {
+      busy = false;
+    }
   }
 
-  onMount(refreshData);
+  onMount(sync);
 </script>
 
 <svelte:head>
-  <title>Monitor Command Deck</title>
-  <meta
-    name="description"
-    content="Monitor local-first command deck for Python, AI automation, and web3 opportunity acquisition."
-  />
+  <title>Monitor</title>
 </svelte:head>
 
-<main class="shell">
-  <section class="hero panel" aria-labelledby="mission-control-title">
-    <div>
-      <p class="eyebrow">Sovereign Opportunity Acquisition</p>
-      <h1 id="mission-control-title">Monitor Command Deck</h1>
-      <p class="lede">
-        Signal mesh for X, Discord, Upwork, Fiverr, and crypto job boards — qualifying
-        Python/web3 gigs and preparing proposal-grade outreach under risk-based autonomy.
-      </p>
-      {#if dataError}
-        <p class="alert">{dataError}</p>
-      {/if}
-    </div>
+<div class="space" aria-hidden="true">
+  <div class="starfield a"></div>
+  <div class="starfield b"></div>
+  <div class="nebula n1"></div>
+  <div class="nebula n2"></div>
+  <div class="horizon"></div>
+</div>
 
-    <div class="api-card" class:online={health?.status === 'ok'}>
-      <span class="pulse" aria-hidden="true"></span>
-      <div>
-        <p>Local API</p>
-        {#if health}
-          <strong>{health.status.toUpperCase()}</strong>
-          <small>{health.service} v{health.version}</small>
-        {:else if loading}
-          <strong>CHECKING</strong>
-          <small>Loading API health…</small>
-        {:else}
-          <strong>OFFLINE</strong>
-          <small>{apiError}</small>
-        {/if}
-      </div>
-    </div>
+<main class="deck">
+  <header class="top">
+    <div class="mark">MONITOR</div>
+    <div class:online class="pulse">{online ? 'ONLINE' : 'OFFLINE'}</div>
+  </header>
+
+  <section class="orbital">
+    <div class="ring r1"></div>
+    <div class="ring r2"></div>
+    <div class="ring r3"></div>
+    <button class="planet" on:click={sync} disabled={busy} aria-label="Sync">
+      <span>{busy ? '...' : stats?.signals_count ?? 0}</span>
+      <small>SIGNALS</small>
+    </button>
+    <div class="moon m1">X</div>
+    <div class="moon m2">RSS</div>
+    <div class="moon m3">UPWORK</div>
+    <div class="moon m4">DISCORD</div>
   </section>
 
-  <section class="stats-grid" aria-label="Store counts">
-    <article class="panel stat-card">
-      <p class="eyebrow">Signals</p>
-      <strong>{stats?.signals_count ?? '—'}</strong>
-      <span>captured project signals</span>
-    </article>
-    <article class="panel stat-card">
-      <p class="eyebrow">Opportunities</p>
-      <strong>{stats?.opportunities_count ?? '—'}</strong>
-      <span>qualified opportunity records</span>
-    </article>
-    <article class="panel stat-card storage">
-      <p class="eyebrow">Store</p>
-      <strong>{stats?.storage_exists ? 'READY' : 'EMPTY'}</strong>
-      <span>{stats?.storage_path ?? 'Waiting for /api/store/stats'}</span>
-    </article>
+  <section class="commands" aria-label="Commands">
+    <button on:click={scan} disabled={busy}>SCAN</button>
+    <button on:click={qualify} disabled={busy || !signal}>QUALIFY</button>
+    <button on:click={draft} disabled={busy || !opportunity}>DRAFT</button>
+    <button on:click={() => action('approve')} disabled={busy || !proposal}>APPROVE</button>
+    <button on:click={() => action('execute')} disabled={busy || !proposal}>EXECUTE</button>
+    <button class="reject" on:click={() => action('reject')} disabled={busy || !proposal}>REJECT</button>
   </section>
 
-  <section class="grid two">
-    <article class="panel scan-panel">
-      <div class="section-heading">
-        <div>
-          <p class="eyebrow">Signal Mesh</p>
-          <h2>Run source scan</h2>
-        </div>
-        <button class="ghost-button" type="button" on:click={refreshData} disabled={loading || scanning}>
-          {loading ? 'Refreshing…' : 'Refresh'}
-        </button>
-      </div>
-
-      <form class="scan-form" on:submit|preventDefault={submitScan}>
-        <label>
-          Source
-          <select bind:value={selectedSource}>
-            {#each sourceStatuses as source}
-              <option value={source.id}>{source.label}</option>
-            {/each}
-          </select>
-        </label>
-        <label>
-          Query
-          <input bind:value={scanQuery} placeholder="python web3 automation dashboard" />
-        </label>
-        <label>
-          Limit
-          <input type="number" min="0" max="50" bind:value={scanLimit} />
-        </label>
-        <button type="submit" disabled={scanning || !scanQuery.trim()}>
-          {scanning ? 'Scanning…' : 'Run scan'}
-        </button>
-      </form>
-
-      {#if selectedSourceStatus}
-        <p class="muted source-note">{selectedSourceStatus.description}</p>
-      {/if}
-      {#if scanMessage}
-        <p class="success">{scanMessage}</p>
-      {/if}
-      {#if scanError}
-        <p class="alert">{scanError}</p>
-      {/if}
-    </article>
-
-    <article class="panel approval-placeholder">
-      <p class="eyebrow">Approval Cockpit</p>
-      <h2>Human gate</h2>
-      <p>
-        Draft generation and action proposals are live as local records. Approve/reject decisions
-        are logged; execution calls a configured real executor and fails honestly when none is set.
-      </p>
-      {#if actionProposals.length}
-        <div class="item-list compact-list">
-          {#each actionProposals.slice(0, 4) as proposal}
-            <article class="item-card">
-              <div class="item-topline">
-                <span>{proposal.platform}</span>
-                <span>{formatPercent(proposal.match_score)} match</span>
-              </div>
-              <h3>{proposal.action_kind}</h3>
-              <p>{proposal.destination}</p>
-              <div class="chip-row">
-                <span class:risk={proposal.requires_approval}>approval required</span>
-                <span>{proposal.risk_level} risk</span>
-                <span>{formatPercent(proposal.scam_risk_score)} scam risk</span>
-              </div>
-              <div class="action-row">
-                <button type="button" on:click={() => handleAction('approve', proposal.id)}>Approve</button>
-                <button type="button" on:click={() => handleAction('reject', proposal.id)}>Reject</button>
-                <button type="button" on:click={() => handleAction('execute', proposal.id)}>Execute</button>
-              </div>
-            </article>
-          {/each}
-        </div>
-      {:else}
-        <div class="status-pill">No pending proposals loaded</div>
-      {/if}
-      {#if auditEvents.length}
-        <p class="muted source-note">Latest audit event: {auditEvents[0].event_type}</p>
-      {/if}
-      {#if actionMessage}
-        <p class="success">{actionMessage}</p>
-      {/if}
-      {#if actionError}
-        <p class="alert">{actionError}</p>
-      {/if}
-    </article>
-  </section>
-
-  <section class="grid two lists">
-    <article class="panel">
-      <div class="section-heading">
-        <div>
-          <p class="eyebrow">Latest Signals</p>
-          <h2>Signal intake</h2>
-        </div>
-        <span class="constellation-label">{signals.length} total</span>
-      </div>
-      {#if latestSignals.length}
-        <div class="item-list">
-          {#each latestSignals as signal}
-            <article class="item-card">
-              <div class="item-topline">
-                <span>{signal.source_platform}</span>
-                <span>{formatDate(signal.captured_at)}</span>
-              </div>
-              <h3>{signal.title}</h3>
-              <p>{signal.raw_text}</p>
-              <div class="chip-row">
-                <span>{signal.signal_kind}</span>
-                <span>{signal.contact_route}</span>
-                <span class:risk={signal.risk_level !== 'low'}>{signal.risk_level} risk</span>
-              </div>
-            </article>
-          {/each}
-        </div>
-      {:else}
-        <p class="empty">No signals yet. Run a source scan to populate the mesh.</p>
-      {/if}
-    </article>
-
-    <article class="panel">
-      <div class="section-heading">
-        <div>
-          <p class="eyebrow">Latest Opportunities</p>
-          <h2>Qualified leads</h2>
-        </div>
-        <span class="constellation-label">{opportunities.length} total</span>
-      </div>
-      {#if latestOpportunities.length}
-        <div class="item-list">
-          {#each latestOpportunities as opportunity}
-            <article class="item-card opportunity-card">
-              <div class="item-topline">
-                <span>{opportunity.source_platform}</span>
-                <span>{formatDate(opportunity.created_at)}</span>
-              </div>
-              <h3>{opportunity.title}</h3>
-              <p>{opportunity.description}</p>
-              <div class="score-row">
-                <span>Fit {formatPercent(opportunity.qualification_score)}</span>
-                <span>Python {formatPercent(opportunity.python_fit_score)}</span>
-                <span>Scam {formatPercent(opportunity.scam_risk_score)}</span>
-              </div>
-            </article>
-          {/each}
-        </div>
-      {:else}
-        <p class="empty">No opportunities yet. Conversion/scoring can populate this list when ready.</p>
-      {/if}
-    </article>
-  </section>
-
-  <section class="panel">
-    <div class="section-heading">
-      <div>
-        <p class="eyebrow">Mission Queue</p>
-        <h2>Next best actions</h2>
-      </div>
-      <span class="constellation-label">Source constellation baseline</span>
-    </div>
-    <div class="source-grid">
-      {#each sourceStatuses as source}
-        <article class="source-card">
-          <div class="orb" aria-hidden="true"></div>
-          <h3>{source.label}</h3>
-          <p>{source.description}</p>
-          <span>{source.status}</span>
-        </article>
-      {/each}
-    </div>
-    <ol class="mission-list">
-      {#each priorityMissions as mission}
-        <li>{mission}</li>
-      {/each}
-    </ol>
+  <section class="readout" aria-label="Status">
+    <div>{statusLine}</div>
+    <div>{stats?.opportunities_count ?? 0} OPP</div>
+    <div>{stats?.action_proposals_count ?? 0} ACTIONS</div>
+    <div>{audit[0]?.event_type ?? 'NO AUDIT'}</div>
   </section>
 </main>
 
@@ -379,66 +185,64 @@
   :global(body) {
     margin: 0;
     min-height: 100vh;
-    color: #f5f0ff;
-    background:
-      radial-gradient(circle at top left, rgba(126, 58, 242, 0.28), transparent 32rem),
-      radial-gradient(circle at 70% 20%, rgba(71, 85, 105, 0.22), transparent 26rem),
-      #05030a;
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    overflow: hidden;
+    color: #eff6ff;
+    background: #000;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   }
-  .shell { width: min(1180px, calc(100vw - 32px)); margin: 0 auto; padding: 40px 0; }
-  .panel {
-    border: 1px solid rgba(168, 85, 247, 0.22);
-    border-radius: 28px;
-    background: linear-gradient(135deg, rgba(15, 10, 28, 0.92), rgba(10, 9, 18, 0.78));
-    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(20px);
-    padding: 28px;
+
+  .space { position: fixed; inset: 0; z-index: -10; background: radial-gradient(circle at 50% 120%, #172554 0%, #020617 38%, #000 74%); }
+  .space::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,.36) 45%, rgba(0,0,0,.9) 100%); }
+  .starfield { position: absolute; inset: -20%; background-image: radial-gradient(circle, rgba(255,255,255,.9) 0 1px, transparent 1.5px); opacity: .7; animation: drift 60s linear infinite; }
+  .starfield.a { background-size: 130px 130px; }
+  .starfield.b { background-size: 210px 210px; animation-duration: 95s; opacity: .4; }
+  .nebula { position: absolute; width: 55vw; height: 55vw; border-radius: 50%; filter: blur(90px); opacity: .34; mix-blend-mode: screen; }
+  .n1 { left: -18vw; top: -10vh; background: #2563eb; }
+  .n2 { right: -20vw; top: 4vh; background: #7c3aed; }
+  .horizon { position: absolute; left: -15vw; right: -15vw; bottom: -22vh; height: 54vh; background: linear-gradient(rgba(96,165,250,.18) 1px, transparent 1px), linear-gradient(90deg, rgba(96,165,250,.14) 1px, transparent 1px); background-size: 70px 70px; transform: perspective(520px) rotateX(64deg); animation: grid 7s linear infinite; opacity: .5; }
+  @keyframes drift { to { transform: translate3d(-160px, 90px, 0); } }
+  @keyframes grid { to { background-position: 0 70px, 70px 0; } }
+
+  .deck { width: min(1180px, calc(100vw - 32px)); height: 100vh; margin: 0 auto; display: grid; grid-template-rows: auto 1fr auto auto; gap: 18px; padding: 22px 0; }
+  .top { display: flex; justify-content: space-between; align-items: center; height: 54px; border: 1px solid rgba(147,197,253,.18); background: rgba(2,6,23,.52); backdrop-filter: blur(18px); padding: 0 18px; letter-spacing: .2em; }
+  .mark { font-size: 1.05rem; font-weight: 900; }
+  .pulse { color: #fecdd3; }
+  .pulse::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 10px; border-radius: 50%; background: #fb7185; box-shadow: 0 0 20px #fb7185; }
+  .pulse.online { color: #bfdbfe; }
+  .pulse.online::before { background: #38bdf8; box-shadow: 0 0 20px #38bdf8; }
+
+  .orbital { position: relative; display: grid; place-items: center; min-height: 0; }
+  .ring { position: absolute; border: 1px solid rgba(147,197,253,.22); border-radius: 50%; transform: rotateX(65deg) rotateZ(-20deg); }
+  .r1 { width: min(38vw, 430px); height: min(38vw, 430px); animation: spin 18s linear infinite; }
+  .r2 { width: min(54vw, 620px); height: min(54vw, 620px); animation: spin 30s linear infinite reverse; border-color: rgba(196,181,253,.18); }
+  .r3 { width: min(70vw, 800px); height: min(70vw, 800px); animation: spin 48s linear infinite; border-color: rgba(125,211,252,.12); }
+  @keyframes spin { to { transform: rotateX(65deg) rotateZ(340deg); } }
+
+  .planet { position: relative; z-index: 3; width: clamp(190px, 24vw, 300px); height: clamp(190px, 24vw, 300px); border-radius: 50%; display: grid; place-items: center; border: 1px solid rgba(191,219,254,.62); color: #fff; background: radial-gradient(circle at 32% 25%, #fff 0 3%, #38bdf8 8%, #1d4ed8 28%, #020617 68%); box-shadow: 0 0 110px rgba(37,99,235,.52), inset -34px -38px 80px rgba(0,0,0,.86); cursor: pointer; }
+  .planet span { font-size: clamp(4rem, 10vw, 8rem); font-weight: 900; letter-spacing: -.12em; line-height: .75; }
+  .planet small { position: absolute; bottom: 28%; left: 50%; transform: translateX(-50%); letter-spacing: .28em; color: rgba(239,246,255,.72); }
+  .planet:disabled { opacity: .78; }
+
+  .moon { position: absolute; z-index: 4; min-width: 74px; padding: 10px 12px; border: 1px solid rgba(147,197,253,.28); background: rgba(2,6,23,.7); backdrop-filter: blur(14px); color: #dbeafe; text-align: center; font-size: .7rem; letter-spacing: .14em; box-shadow: 0 0 24px rgba(56,189,248,.16); }
+  .m1 { top: 10%; left: 20%; }
+  .m2 { top: 18%; right: 19%; }
+  .m3 { bottom: 15%; right: 14%; }
+  .m4 { bottom: 18%; left: 13%; }
+
+  .commands { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+  button { min-height: 64px; border: 1px solid rgba(147,197,253,.22); color: #eff6ff; background: rgba(15,23,42,.72); backdrop-filter: blur(16px); font: 900 .86rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .18em; cursor: pointer; transition: transform .16s, border-color .16s, background .16s; }
+  button:hover:not(:disabled) { transform: translateY(-2px); border-color: rgba(125,211,252,.75); background: rgba(14,165,233,.22); }
+  button:disabled { opacity: .36; cursor: not-allowed; }
+  button.reject:hover:not(:disabled) { border-color: rgba(251,113,133,.75); background: rgba(127,29,29,.32); }
+
+  .readout { display: grid; grid-template-columns: 2fr 1fr 1fr 1.4fr; gap: 10px; }
+  .readout div { min-height: 54px; display: flex; align-items: center; border: 1px solid rgba(147,197,253,.16); background: rgba(2,6,23,.64); color: #bfdbfe; padding: 0 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: .08em; }
+
+  @media (max-width: 860px) {
+    :global(body) { overflow: auto; }
+    .deck { height: auto; min-height: 100vh; }
+    .commands, .readout { grid-template-columns: 1fr 1fr; }
+    .orbital { min-height: 460px; }
+    .moon { font-size: .62rem; min-width: 60px; }
   }
-  .hero { display: grid; grid-template-columns: 1fr minmax(260px, 340px); gap: 28px; align-items: stretch; margin-bottom: 24px; }
-  .eyebrow { color: #c4b5fd; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.16em; margin: 0 0 10px; text-transform: uppercase; }
-  h1, h2, h3, p { margin-top: 0; }
-  h1 { font-size: clamp(2.6rem, 8vw, 6.4rem); line-height: 0.92; margin-bottom: 18px; letter-spacing: -0.08em; }
-  h2 { font-size: 1.45rem; margin-bottom: 16px; }
-  h3 { margin-bottom: 10px; }
-  .lede, .approval-placeholder p, .muted { color: #d6ccf4; font-size: 1.04rem; line-height: 1.7; }
-  .lede { max-width: 760px; }
-  .api-card { display: flex; gap: 16px; align-items: center; border: 1px solid rgba(148, 163, 184, 0.22); border-radius: 22px; padding: 22px; background: rgba(8, 7, 14, 0.78); }
-  .api-card p, .api-card small { color: #a7a2b8; display: block; margin: 0; }
-  .api-card strong { display: block; font-size: 2rem; letter-spacing: 0.05em; }
-  .pulse { width: 18px; height: 18px; border-radius: 999px; background: #fb7185; box-shadow: 0 0 24px #fb7185; }
-  .api-card.online .pulse { background: #8b5cf6; box-shadow: 0 0 28px #8b5cf6; }
-  .stats-grid { display: grid; grid-template-columns: 0.7fr 0.7fr 1.6fr; gap: 18px; margin-bottom: 24px; }
-  .stat-card strong { display: block; font-size: 2.5rem; letter-spacing: -0.04em; }
-  .stat-card span { color: #bdb4d7; overflow-wrap: anywhere; }
-  .grid.two { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px; margin-bottom: 24px; }
-  .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
-  .scan-form { display: grid; grid-template-columns: 0.9fr 1.7fr 0.6fr auto; gap: 12px; align-items: end; }
-  label { display: grid; gap: 8px; color: #c4b5fd; font-size: 0.82rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; }
-  input, select, button { min-height: 44px; border-radius: 14px; border: 1px solid rgba(168, 85, 247, 0.3); color: #f5f0ff; background: rgba(8, 7, 14, 0.82); padding: 0 14px; font: inherit; }
-  button { cursor: pointer; font-weight: 800; background: linear-gradient(135deg, #7c3aed, #a855f7); }
-  button:disabled { cursor: not-allowed; opacity: 0.55; }
-  .ghost-button { background: rgba(88, 28, 135, 0.24); }
-  .source-note, .success, .alert { margin: 16px 0 0; }
-  .success { color: #86efac; }
-  .alert { color: #fecdd3; }
-  .status-pill, .source-card span, .constellation-label, .chip-row span, .score-row span {
-    display: inline-flex; border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 999px; color: #ddd6fe; background: rgba(88, 28, 135, 0.26); padding: 8px 12px; font-size: 0.78rem; font-weight: 800; text-transform: uppercase;
-  }
-  .item-list { display: grid; gap: 14px; }
-  .item-card { border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 20px; background: rgba(8, 7, 14, 0.54); padding: 16px; }
-  .item-card p { color: #bdb4d7; line-height: 1.55; }
-  .item-topline, .chip-row, .score-row, .action-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
-  .item-topline { color: #a7a2b8; font-size: 0.78rem; margin-bottom: 10px; text-transform: uppercase; }
-  .chip-row, .score-row { justify-content: flex-start; }
-  .action-row { justify-content: flex-start; margin-top: 12px; }
-  .action-row button { min-height: 36px; font-size: 0.82rem; }
-  .chip-row span.risk { border-color: rgba(251, 113, 133, 0.5); color: #fecdd3; }
-  .empty { color: #a7a2b8; border: 1px dashed rgba(168, 85, 247, 0.28); border-radius: 18px; padding: 18px; }
-  .source-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
-  .source-card { min-height: 210px; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 22px; background: radial-gradient(circle at top, rgba(124, 58, 237, 0.2), rgba(15, 10, 28, 0.76)); padding: 18px; }
-  .source-card p { color: #bdb4d7; line-height: 1.55; min-height: 76px; }
-  .orb { width: 42px; height: 42px; border-radius: 999px; margin-bottom: 16px; background: radial-gradient(circle, #f5f3ff, #8b5cf6 48%, rgba(139, 92, 246, 0.08)); box-shadow: 0 0 42px rgba(139, 92, 246, 0.72); }
-  .mission-list { display: grid; gap: 12px; margin: 0; padding-left: 22px; color: #ddd6fe; }
-  @media (max-width: 980px) { .hero, .grid.two, .stats-grid, .scan-form, .source-grid { grid-template-columns: 1fr; } }
 </style>

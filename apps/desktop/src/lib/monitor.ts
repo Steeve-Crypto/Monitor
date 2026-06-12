@@ -189,6 +189,12 @@ export const sourceStatuses: SourceStatus[] = [
   }
 ];
 
+const API_BASE = 'http://127.0.0.1:8765';
+
+function apiPath(path: string): string {
+  return `${API_BASE}${path}`;
+}
+
 async function readJson<T>(response: Response, errorMessage: string): Promise<T> {
   if (!response.ok) {
     throw new Error(`${errorMessage}: ${response.status}`);
@@ -197,29 +203,29 @@ async function readJson<T>(response: Response, errorMessage: string): Promise<T>
 }
 
 export async function fetchApiHealth(fetcher: typeof fetch = fetch): Promise<ApiHealth> {
-  const response = await fetcher('/api/health');
+  const response = await fetcher(apiPath('/api/health'));
   return readJson<ApiHealth>(response, 'Monitor API health check failed');
 }
 
 export async function fetchStoreStats(fetcher: typeof fetch = fetch): Promise<StoreStats> {
-  const response = await fetcher('/api/store/stats');
+  const response = await fetcher(apiPath('/api/store/stats'));
   return readJson<StoreStats>(response, 'Monitor API store stats fetch failed');
 }
 
 export async function fetchSignals(fetcher: typeof fetch = fetch): Promise<SignalListResponse> {
-  const response = await fetcher('/api/signals');
+  const response = await fetcher(apiPath('/api/signals'));
   return readJson<SignalListResponse>(response, 'Monitor API signals fetch failed');
 }
 
 export async function fetchOpportunities(fetcher: typeof fetch = fetch): Promise<OpportunityListResponse> {
-  const response = await fetcher('/api/opportunities');
+  const response = await fetcher(apiPath('/api/opportunities'));
   return readJson<OpportunityListResponse>(response, 'Monitor API opportunities fetch failed');
 }
 
 export async function fetchActionProposals(
   fetcher: typeof fetch = fetch
 ): Promise<ActionProposalListResponse> {
-  const response = await fetcher('/api/actions/proposals');
+  const response = await fetcher(apiPath('/api/actions/proposals'));
   return readJson<ActionProposalListResponse>(
     response,
     'Monitor API action proposals fetch failed'
@@ -227,7 +233,7 @@ export async function fetchActionProposals(
 }
 
 export async function fetchAuditEvents(fetcher: typeof fetch = fetch): Promise<AuditEventListResponse> {
-  const response = await fetcher('/api/audit');
+  const response = await fetcher(apiPath('/api/audit'));
   return readJson<AuditEventListResponse>(response, 'Monitor API audit fetch failed');
 }
 
@@ -235,7 +241,7 @@ export async function executeActionProposal(
   actionId: string,
   fetcher: typeof fetch = fetch
 ): Promise<Application> {
-  const response = await fetcher(`/api/actions/${actionId}/execute`, { method: 'POST' });
+  const response = await fetcher(apiPath(`/api/actions/${actionId}/execute`), { method: 'POST' });
   return readJson<Application>(response, 'Monitor API external action execution failed');
 }
 
@@ -243,7 +249,7 @@ export async function approveActionProposal(
   actionId: string,
   fetcher: typeof fetch = fetch
 ): Promise<ApprovalDecision> {
-  const response = await fetcher(`/api/actions/${actionId}/approve`, {
+  const response = await fetcher(apiPath(`/api/actions/${actionId}/approve`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ decided_by: 'operator' })
@@ -255,12 +261,44 @@ export async function rejectActionProposal(
   actionId: string,
   fetcher: typeof fetch = fetch
 ): Promise<ApprovalDecision> {
-  const response = await fetcher(`/api/actions/${actionId}/reject`, {
+  const response = await fetcher(apiPath(`/api/actions/${actionId}/reject`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ decided_by: 'operator' })
   });
   return readJson<ApprovalDecision>(response, 'Monitor API action rejection failed');
+}
+
+export async function qualifySignal(
+  signalId: string,
+  fetcher: typeof fetch = fetch
+): Promise<Opportunity> {
+  const response = await fetcher(apiPath(`/api/signals/${signalId}/qualify`), { method: 'POST' });
+  return readJson<Opportunity>(response, 'Monitor API qualification failed');
+}
+
+export async function createDraft(
+  opportunityId: string,
+  fetcher: typeof fetch = fetch
+): Promise<OutreachDraft> {
+  const response = await fetcher(apiPath(`/api/opportunities/${opportunityId}/draft`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  return readJson<OutreachDraft>(response, 'Monitor API draft creation failed');
+}
+
+export async function proposeAction(
+  opportunityId: string,
+  fetcher: typeof fetch = fetch
+): Promise<ActionProposal> {
+  const response = await fetcher(apiPath(`/api/opportunities/${opportunityId}/actions/propose`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  return readJson<ActionProposal>(response, 'Monitor API action proposal failed');
 }
 
 export async function runScan(
@@ -269,7 +307,7 @@ export async function runScan(
   limit: number,
   fetcher: typeof fetch = fetch
 ): Promise<ScanResponse> {
-  const response = await fetcher(`/api/scans/${source}/run`, {
+  const response = await fetcher(apiPath(`/api/scans/${source}/run`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, limit })

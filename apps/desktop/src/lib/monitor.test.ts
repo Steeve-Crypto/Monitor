@@ -46,7 +46,7 @@ describe('fetchStoreStats', () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify(stats), { status: 200 }));
 
     await expect(fetchStoreStats(fetcher as unknown as typeof fetch)).resolves.toEqual(stats);
-    expect(fetcher).toHaveBeenCalledWith('/api/store/stats');
+    expect(fetcher).toHaveBeenCalledWith('http://127.0.0.1:8765/api/store/stats');
   });
 
   it('raises an actionable error when stats fail', async () => {
@@ -84,7 +84,7 @@ describe('fetchSignals', () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 }));
 
     await expect(fetchSignals(fetcher as unknown as typeof fetch)).resolves.toEqual(payload);
-    expect(fetcher).toHaveBeenCalledWith('/api/signals');
+    expect(fetcher).toHaveBeenCalledWith('http://127.0.0.1:8765/api/signals');
   });
 });
 
@@ -123,7 +123,7 @@ describe('fetchOpportunities', () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 }));
 
     await expect(fetchOpportunities(fetcher as unknown as typeof fetch)).resolves.toEqual(payload);
-    expect(fetcher).toHaveBeenCalledWith('/api/opportunities');
+    expect(fetcher).toHaveBeenCalledWith('http://127.0.0.1:8765/api/opportunities');
   });
 });
 
@@ -135,7 +135,7 @@ describe('runScan', () => {
     await expect(runScan('crypto_rss', 'python web3', 7, fetcher as unknown as typeof fetch)).resolves.toEqual(
       payload
     );
-    expect(fetcher).toHaveBeenCalledWith('/api/scans/crypto_rss/run', {
+    expect(fetcher).toHaveBeenCalledWith('http://127.0.0.1:8765/api/scans/crypto_rss/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: 'python web3', limit: 7 })
@@ -184,7 +184,7 @@ describe('fetchActionProposals', () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 }));
 
     await expect(fetchActionProposals(fetcher as unknown as typeof fetch)).resolves.toEqual(payload);
-    expect(fetcher).toHaveBeenCalledWith('/api/actions/proposals');
+    expect(fetcher).toHaveBeenCalledWith('http://127.0.0.1:8765/api/actions/proposals');
   });
 });
 
@@ -206,7 +206,7 @@ describe('fetchAuditEvents', () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 }));
 
     await expect(fetchAuditEvents(fetcher as unknown as typeof fetch)).resolves.toEqual(payload);
-    expect(fetcher).toHaveBeenCalledWith('/api/audit');
+    expect(fetcher).toHaveBeenCalledWith('http://127.0.0.1:8765/api/audit');
   });
 });
 
@@ -227,6 +227,6 @@ describe('executeActionProposal', () => {
     await expect(
       executeActionProposal('act_1', fetcher as unknown as typeof fetch)
     ).resolves.toEqual(payload);
-    expect(fetcher).toHaveBeenCalledWith('/api/actions/act_1/execute', { method: 'POST' });
+    expect(fetcher).toHaveBeenCalledWith('http://127.0.0.1:8765/api/actions/act_1/execute', { method: 'POST' });
   });
 });
