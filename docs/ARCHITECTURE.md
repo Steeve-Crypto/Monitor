@@ -29,10 +29,19 @@ The architecture prioritizes:
 - **Social Signal Layer**: X API/Grok search for buying-intent posts, founder/project hiring signals, web3 bounty mentions, urgent Python automation needs, and DM-worthy threads. Discord bot/API monitors approved servers/channels for gig posts, grant/bounty leads, project launches, and hiring requests.
 - **Marketplace Layer**: Upwork, Fiverr, Contra/other freelance marketplaces where available through official interfaces, RSS/email alerts, saved searches, and whitelisted browser workflows.
 - **Crypto Job Board Layer**: Cryptocurrency Jobs, CryptoJobsList, Web3.career, Remote3, Dework, Gitcoin bounties/grants, Layer3/Zealy-style bounty surfaces where appropriate.
+- **Live-Safe RSS Layer**: `crypto_rss` ingests an operator-configured public `http`/`https` RSS feed from `MONITOR_CRYPTO_RSS_FEED_URL`, filters by query keywords, and never uses credentials or performs outbound actions.
 - **API/RSS/Email Layer**: Company career endpoints, RSS feeds, mailing lists, GitHub issues/discussions, Telegram/Discord forwarded alerts where operator-authorized.
 - **Browser Layer**: Playwright only on explicitly whitelisted and compliant workflows. No credential use or submission without approval/autopilot policy.
 - **Output**: Normalized `Opportunity` and `ProjectSignal` objects with source, title/post text, project, budget/compensation signals, required stack, urgency, contact route, reputation risk, and match hints.
 - **Targeting Focus**: Python, AI automation, data/backend, agentic tooling, smart contracts, web3 integrations, crypto infra, bots, dashboards, and rapid MVP builds.
+
+### 2.2.1 Persistent Signal Mesh Store
+- **Default Storage**: `.monitor/signal_mesh_store.json` under the API working directory.
+- **Configuration**: `MONITOR_SIGNAL_MESH_STORE_PATH` or `create_app(storage_path=...)` for tests and alternate local stores.
+- **Contents**: Normalized `ProjectSignal` and `Opportunity` collections only. No credentials or decrypted vault secrets.
+- **Write Model**: Human-readable JSON with temp-file + replace atomic writes.
+- **API Visibility**: `/api/store/stats` exposes counts and storage path metadata, not raw secrets.
+- **Dedupe Baseline**: Signal inserts are deduped by `(source_platform, source_id)` so repeated scans do not create duplicate leads.
 
 ### 2.3 Hermes Skill Lattice (Core Intelligence)
 Hermes Agent runs persistently and manages:
@@ -66,7 +75,7 @@ Skills are stored as versioned files/modules that Hermes loads and can modify.
 
 ### 2.6 Full-Stack Command Deck (Primary UX Layer)
 - Tauri desktop shell.
-- SvelteKit frontend with TypeScript.
+- Svelte/Vite frontend with TypeScript. SvelteKit was attempted first, but SSR production build was unreliable on the mounted Windows path; the current Tauri-ready shell uses plain Svelte/Vite for a smaller, more reliable desktop bundle.
 - Three.js visualization layer for opportunity constellations, risk maps, and timelines.
 - Local Python FastAPI service for vault, scanners, Hermes orchestration, risk gating, and audit logs.
 - CLI remains a secondary utility surface for automation, debugging, recovery, and scripted operations.
@@ -84,14 +93,17 @@ Skills are stored as versioned files/modules that Hermes loads and can modify.
 - `ActionProposal`: Proposed local or external action with payload hash, destination, risk classification, approval/autopilot decision, and policy reference when applicable.
 - `ApprovalDecision`: Operator decision for reputation-risk actions.
 - `AuditEvent`: Immutable log of all significant actions.
+- `SignalMeshStore`: Local persistence boundary for signal/opportunity collections.
 
 Full Pydantic models defined in code (see tasks MON-006).
 
 ## 4. Key Flows
 1. **Signal Discovery Flow**: X/Discord/marketplace/crypto board scanners → ProjectSignal/Opportunity normalization → dedupe + semantic memory → Scout/Qualifier Skills → ranked opportunities presented in deck.
+   - Current live-safe path: `crypto_rss` → RSS item parsing → query keyword filtering → `ProjectSignal` normalization → store-level dedupe/persistence.
 2. **Application/Outreach Flow**: Select or auto-qualify opportunity → Tailor Skill → Risk Classification → Approval Cockpit or scoped Autopilot policy → Executor Skill.
 3. **Evolution Flow**: After outcome data → Reflector Skill → Updated skill files + improved future performance.
 4. **Full-Stack UX Flow**: Tauri/Svelte command deck → local FastAPI service → Vault/Scanner/Hermes/Risk/Autopilot services → encrypted storage + audit log.
+5. **Persistence Flow**: API action → `JsonSignalMeshStore` → `.monitor/signal_mesh_store.json` → `/api/store/stats` + future dedupe/semantic memory.
 
 ## 5. Security & Privacy Model
 See [SECURITY.md](SECURITY.md) for detailed threat model and controls. Core rules:
@@ -106,8 +118,9 @@ See [SECURITY.md](SECURITY.md) for detailed threat model and controls. Core rule
 - **Discord API/Bot**: Approved server/channel monitoring and signal capture.
 - **Marketplace/Crypto Board APIs/RSS/Email**: Upwork/Fiverr alerts, crypto job boards, bounties, grants, and saved searches.
 - **Playwright**: Controlled browser automation (whitelisted and compliant workflows only).
-- **Tauri + SvelteKit + Three.js**: Primary full-stack command deck.
+- **Tauri + Svelte/Vite + Three.js**: Primary full-stack command deck.
 - **FastAPI**: Local backend API for the desktop app.
+- **JsonSignalMeshStore**: Current local persistence layer before encrypted vault and vector memory are introduced.
 - **Future**: Potential n8n/Make.com bridges for email sources if needed.
 
 ## 7. Evolution Path

@@ -16,8 +16,8 @@ def test_health_endpoint_reports_monitor_api_ready():
     }
 
 
-def test_list_signals_starts_empty_and_uses_contract_shape():
-    client = TestClient(create_app())
+def test_list_signals_starts_empty_and_uses_contract_shape(tmp_path):
+    client = TestClient(create_app(storage_path=tmp_path / "signal_mesh.json"))
 
     response = client.get("/api/signals")
 
@@ -26,8 +26,8 @@ def test_list_signals_starts_empty_and_uses_contract_shape():
     assert body == {"items": [], "count": 0}
 
 
-def test_create_signal_returns_normalized_project_signal():
-    client = TestClient(create_app())
+def test_create_signal_returns_normalized_project_signal(tmp_path):
+    client = TestClient(create_app(storage_path=tmp_path / "signal_mesh.json"))
 
     response = client.post(
         "/api/signals",
@@ -54,8 +54,8 @@ def test_create_signal_returns_normalized_project_signal():
     assert list_response.json()["count"] == 1
 
 
-def test_list_opportunities_starts_empty_and_uses_contract_shape():
-    client = TestClient(create_app())
+def test_list_opportunities_starts_empty_and_uses_contract_shape(tmp_path):
+    client = TestClient(create_app(storage_path=tmp_path / "signal_mesh.json"))
 
     response = client.get("/api/opportunities")
 
@@ -63,8 +63,8 @@ def test_list_opportunities_starts_empty_and_uses_contract_shape():
     assert response.json() == {"items": [], "count": 0}
 
 
-def test_create_opportunity_returns_qualification_fields():
-    client = TestClient(create_app())
+def test_create_opportunity_returns_qualification_fields(tmp_path):
+    client = TestClient(create_app(storage_path=tmp_path / "signal_mesh.json"))
 
     response = client.post(
         "/api/opportunities",

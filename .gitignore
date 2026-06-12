@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+.env
+
+# Local Monitor runtime data
+.monitor/
+*.sqlite
+*.sqlite3
+
+# Node / frontend
+node_modules/
+apps/desktop/dist/
+*.tsbuildinfo
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -19,7 +19,7 @@ Monitor is a **local-first, Hermes-native autonomous system** that:
 - Hermes-powered Scout, Tailor, and Executor skills
 - Risk-based approval/autopilot workflow for reputation-risk actions
 - Basic reflection loop for skill improvement
-- Full-stack desktop command deck (Tauri + SvelteKit + Three.js)
+- Full-stack desktop command deck (Tauri + Svelte/Vite + Three.js)
 - Local Python API service for vault, scans, Hermes orchestration, risk gating, and audit logs
 - CLI utilities for automation, debugging, and recovery
 
@@ -36,6 +36,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for full details. High-level components:
 
 - **Encrypted Identity Vault** — Sovereign storage for all personal/professional data. Never transmitted.
 - **Signal & Opportunity Mesh Scanner** — X/Grok, Discord, marketplace, crypto job board, RSS/API, email, and whitelisted browser adapters.
+- **Persistent Signal Mesh Store** — Local JSON-backed persistence for normalized signals and opportunities, configurable with `MONITOR_SIGNAL_MESH_STORE_PATH`; default path is `.monitor/signal_mesh_store.json`.
 - **Hermes Skill Lattice** — Self-evolving skills (Scout, Tailor, Executor, Reflector). Hermes writes and improves permanent skill files.
 - **Risk, Approval & Autopilot Execution Engine** — Human review cockpit by default when a proposed action creates reputation, account, credential, or external-identity risk; scoped autopilot may execute only pre-authorized action classes within explicit limits.
 - **Hybrid LLM Router** — Local-first for private data; API models for heavy reasoning.
@@ -43,6 +44,8 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for full details. High-level components:
 
 **Data Flow (Simplified)**:
 Profile Vault → Signal/Opportunity Scanner → Dedupe + Semantic Memory → Hermes Scout/Qualifier Skill → Ranked Python/web3 opportunities → Hermes Tailor Skill → Personalized proposal/DM/email artifacts → Risk Classification → Approval Cockpit or scoped Autopilot policy → Hermes Executor Skill → Submission/Outreach/Local Update + Logging → Hermes Reflector Skill (periodic evolution).
+
+**Current Implementation Baseline**: FastAPI exposes `/api/health`, `/api/signals`, `/api/opportunities`, `/api/scans/{source}/run`, and `/api/store/stats`. X, Discord, marketplace, and generic crypto adapters currently use deterministic mock output behind stable contracts. The `crypto_rss` source can ingest an operator-configured public `http`/`https` RSS feed via `MONITOR_CRYPTO_RSS_FEED_URL` and persists only new signals by source platform + source id.
 
 ## 3. Key Decisions & Constraints
 - **Hermes Integration**: Primary runtime. We extend Hermes with custom persistent skills rather than building a parallel agent framework from scratch.
@@ -64,8 +67,8 @@ Profile Vault → Signal/Opportunity Scanner → Dedupe + Semantic Memory → He
 ## 5. Change Management
 Any modification to scope, architecture, safety model, or Hermes integration **must** be reflected in this Source of Truth first, then propagated to dependent documents and code.
 
-**Current Phase**: Phase 0 — Foundation & Vault  
-**Next Milestone**: Full-stack foundation + encrypted Identity Vault + signal scanner adapters + Python/web3 qualification pipeline + Hermes integration skeleton.
+**Current Phase**: Phase 2 — Signal Discovery & Persistent Signal Mesh  
+**Next Milestone**: Add richer live crypto source presets and dedupe/semantic scoring, then Discord and X/Grok integrations behind platform-safe credential gates.
 
 ---
 

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Monitor",
+  "version": "0.1.0",
+  "identifier": "com.monitor.commanddeck",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:5173",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Monitor Command Deck",
+        "width": 1440,
+        "height": 980,
+        "minWidth": 960,
+        "minHeight": 720,
+        "resizable": true
+      }
+    ]
+  }
+}
