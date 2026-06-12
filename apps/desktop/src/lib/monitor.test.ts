@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  fetchActionProposals,
   fetchApiHealth,
+  executeActionProposal,
+  fetchAuditEvents,
   fetchOpportunities,
   fetchSignals,
   fetchStoreStats,
@@ -152,5 +155,78 @@ describe('sourceStatuses', () => {
   it('includes the live-safe crypto RSS source', () => {
     expect(sourceStatuses.map((source) => source.id)).toContain('crypto_rss');
     expect(sourceStatuses.find((source) => source.id === 'crypto_rss')?.status).toBe('ready');
+  });
+});
+
+describe('fetchActionProposals', () => {
+  it('returns typed action proposal responses from the approval cockpit API', async () => {
+    const payload = {
+      items: [
+        {
+          id: 'act_1',
+          action_kind: 'proposal_submit',
+          platform: 'rss',
+          destination: 'https://example.org/jobs/1',
+          payload_preview: { subject: 'Re: Python Web3 Backend Engineer' },
+          payload_hash: 'abc123',
+          risk_level: 'medium',
+          match_score: 0.91,
+          scam_risk_score: 0.03,
+          bid_amount: null,
+          currency: 'USD',
+          requires_approval: true,
+          autopilot_policy_id: null,
+          created_at: '2026-06-12T00:00:00Z'
+        }
+      ],
+      count: 1
+    };
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 }));
+
+    await expect(fetchActionProposals(fetcher as unknown as typeof fetch)).resolves.toEqual(payload);
+    expect(fetcher).toHaveBeenCalledWith('/api/actions/proposals');
+  });
+});
+
+describe('fetchAuditEvents', () => {
+  it('returns typed audit event responses', async () => {
+    const payload = {
+      items: [
+        {
+          id: 'evt_1',
+          event_type: 'action_proposal.created',
+          actor: 'monitor-api',
+          entity_id: 'act_1',
+          metadata: { opportunity_id: 'opp_1' },
+          occurred_at: '2026-06-12T00:00:00Z'
+        }
+      ],
+      count: 1
+    };
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 }));
+
+    await expect(fetchAuditEvents(fetcher as unknown as typeof fetch)).resolves.toEqual(payload);
+    expect(fetcher).toHaveBeenCalledWith('/api/audit');
+  });
+});
+
+describe('executeActionProposal', () => {
+  it('posts to the real execution endpoint for an approved configured action', async () => {
+    const payload = {
+      id: 'app_1',
+      opportunity_id: 'opp_1',
+      outreach_draft_id: null,
+      action_proposal_id: 'act_1',
+      status: 'submitted',
+      submitted_at: null,
+      outcome_notes: 'Executed via configured webhook with status 200.',
+      created_at: '2026-06-12T00:00:00Z'
+    };
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 }));
+
+    await expect(
+      executeActionProposal('act_1', fetcher as unknown as typeof fetch)
+    ).resolves.toEqual(payload);
+    expect(fetcher).toHaveBeenCalledWith('/api/actions/act_1/execute', { method: 'POST' });
   });
 });

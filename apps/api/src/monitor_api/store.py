@@ -7,7 +7,15 @@ from pathlib import Path
 from threading import RLock
 from typing import Protocol
 
-from monitor_api.models import Opportunity, ProjectSignal
+from monitor_api.models import (
+    ActionProposal,
+    Application,
+    ApprovalDecision,
+    AuditEvent,
+    Opportunity,
+    OutreachDraft,
+    ProjectSignal,
+)
 
 DEFAULT_STORAGE_PATH = Path(".monitor") / "signal_mesh_store.json"
 STORAGE_PATH_ENV = "MONITOR_SIGNAL_MESH_STORE_PATH"
@@ -30,6 +38,28 @@ class SignalMeshStore(Protocol):
 
     def update_signal(self, signal: ProjectSignal) -> ProjectSignal: ...
 
+    def list_outreach_drafts(self) -> list[OutreachDraft]: ...
+
+    def add_outreach_draft(self, draft: OutreachDraft) -> OutreachDraft: ...
+
+    def list_action_proposals(self) -> list[ActionProposal]: ...
+
+    def get_action_proposal(self, action_id: str) -> ActionProposal | None: ...
+
+    def add_action_proposal(self, proposal: ActionProposal) -> ActionProposal: ...
+
+    def add_approval_decision(self, decision: ApprovalDecision) -> ApprovalDecision: ...
+
+    def list_approval_decisions(self) -> list[ApprovalDecision]: ...
+
+    def add_application(self, application: Application) -> Application: ...
+
+    def list_applications(self) -> list[Application]: ...
+
+    def add_audit_event(self, event: AuditEvent) -> AuditEvent: ...
+
+    def list_audit_events(self) -> list[AuditEvent]: ...
+
     def stats(self) -> dict[str, object]: ...
 
 
@@ -41,6 +71,11 @@ class JsonSignalMeshStore:
         self._lock = RLock()
         self._signals: list[ProjectSignal] = []
         self._opportunities: list[Opportunity] = []
+        self._outreach_drafts: list[OutreachDraft] = []
+        self._action_proposals: list[ActionProposal] = []
+        self._approval_decisions: list[ApprovalDecision] = []
+        self._applications: list[Application] = []
+        self._audit_events: list[AuditEvent] = []
         self._load()
 
     def list_signals(self) -> list[ProjectSignal]:
@@ -104,11 +139,72 @@ class JsonSignalMeshStore:
                     return signal
         return signal
 
+    def list_outreach_drafts(self) -> list[OutreachDraft]:
+        with self._lock:
+            return list(self._outreach_drafts)
+
+    def add_outreach_draft(self, draft: OutreachDraft) -> OutreachDraft:
+        with self._lock:
+            self._outreach_drafts.append(draft)
+            self._save()
+        return draft
+
+    def list_action_proposals(self) -> list[ActionProposal]:
+        with self._lock:
+            return list(self._action_proposals)
+
+    def get_action_proposal(self, action_id: str) -> ActionProposal | None:
+        with self._lock:
+            return next(
+                (proposal for proposal in self._action_proposals if proposal.id == action_id),
+                None,
+            )
+
+    def add_action_proposal(self, proposal: ActionProposal) -> ActionProposal:
+        with self._lock:
+            self._action_proposals.append(proposal)
+            self._save()
+        return proposal
+
+    def add_approval_decision(self, decision: ApprovalDecision) -> ApprovalDecision:
+        with self._lock:
+            self._approval_decisions.append(decision)
+            self._save()
+        return decision
+
+    def list_approval_decisions(self) -> list[ApprovalDecision]:
+        with self._lock:
+            return list(self._approval_decisions)
+
+    def add_application(self, application: Application) -> Application:
+        with self._lock:
+            self._applications.append(application)
+            self._save()
+        return application
+
+    def list_applications(self) -> list[Application]:
+        with self._lock:
+            return list(self._applications)
+
+    def add_audit_event(self, event: AuditEvent) -> AuditEvent:
+        with self._lock:
+            self._audit_events.append(event)
+            self._save()
+        return event
+
+    def list_audit_events(self) -> list[AuditEvent]:
+        with self._lock:
+            return list(self._audit_events)
+
     def stats(self) -> dict[str, object]:
         with self._lock:
             return {
                 "signals_count": len(self._signals),
                 "opportunities_count": len(self._opportunities),
+                "drafts_count": len(self._outreach_drafts),
+                "action_proposals_count": len(self._action_proposals),
+                "audit_events_count": len(self._audit_events),
+                "applications_count": len(self._applications),
                 "storage_path": str(self.storage_path),
                 "storage_exists": self.storage_path.exists(),
             }
@@ -118,12 +214,33 @@ class JsonSignalMeshStore:
             if not self.storage_path.exists():
                 self._signals = []
                 self._opportunities = []
+                self._outreach_drafts = []
+                self._action_proposals = []
+                self._approval_decisions = []
+                self._audit_events = []
+                self._applications = []
                 return
 
             raw = json.loads(self.storage_path.read_text(encoding="utf-8"))
             self._signals = [ProjectSignal.model_validate(item) for item in raw.get("signals", [])]
             self._opportunities = [
                 Opportunity.model_validate(item) for item in raw.get("opportunities", [])
+            ]
+            self._outreach_drafts = [
+                OutreachDraft.model_validate(item) for item in raw.get("outreach_drafts", [])
+            ]
+            self._action_proposals = [
+                ActionProposal.model_validate(item) for item in raw.get("action_proposals", [])
+            ]
+            self._approval_decisions = [
+                ApprovalDecision.model_validate(item)
+                for item in raw.get("approval_decisions", [])
+            ]
+            self._audit_events = [
+                AuditEvent.model_validate(item) for item in raw.get("audit_events", [])
+            ]
+            self._applications = [
+                Application.model_validate(item) for item in raw.get("applications", [])
             ]
 
     def _save(self) -> None:
@@ -134,6 +251,19 @@ class JsonSignalMeshStore:
             ],
             "opportunities": [
                 opportunity.model_dump(mode="json") for opportunity in self._opportunities
+            ],
+            "outreach_drafts": [
+                draft.model_dump(mode="json") for draft in self._outreach_drafts
+            ],
+            "action_proposals": [
+                proposal.model_dump(mode="json") for proposal in self._action_proposals
+            ],
+            "approval_decisions": [
+                decision.model_dump(mode="json") for decision in self._approval_decisions
+            ],
+            "audit_events": [event.model_dump(mode="json") for event in self._audit_events],
+            "applications": [
+                application.model_dump(mode="json") for application in self._applications
             ],
         }
         serialized = json.dumps(payload, indent=2, sort_keys=True)

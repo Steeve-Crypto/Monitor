@@ -1,13 +1,20 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import {
+    approveActionProposal,
+    executeActionProposal,
+    fetchActionProposals,
     fetchApiHealth,
+    fetchAuditEvents,
     fetchOpportunities,
     fetchSignals,
     fetchStoreStats,
+    rejectActionProposal,
     runScan,
     sourceStatuses,
+    type ActionProposal,
     type ApiHealth,
+    type AuditEvent,
     type Opportunity,
     type ProjectSignal,
     type SignalSource,
@@ -18,10 +25,14 @@
   let stats: StoreStats | null = null;
   let signals: ProjectSignal[] = [];
   let opportunities: Opportunity[] = [];
+  let actionProposals: ActionProposal[] = [];
+  let auditEvents: AuditEvent[] = [];
   let apiError: string | null = 'Start apps/api to connect live data.';
   let dataError: string | null = null;
   let scanError: string | null = null;
   let scanMessage: string | null = null;
+  let actionError: string | null = null;
+  let actionMessage: string | null = null;
   let loading = true;
   let scanning = false;
   let selectedSource: SignalSource = 'crypto_rss';
@@ -43,16 +54,20 @@
     loading = true;
     dataError = null;
     try {
-      const [nextHealth, nextStats, nextSignals, nextOpportunities] = await Promise.all([
+      const [nextHealth, nextStats, nextSignals, nextOpportunities, nextProposals, nextAudit] = await Promise.all([
         fetchApiHealth(),
         fetchStoreStats(),
         fetchSignals(),
-        fetchOpportunities()
+        fetchOpportunities(),
+        fetchActionProposals(),
+        fetchAuditEvents()
       ]);
       health = nextHealth;
       stats = nextStats;
       signals = nextSignals.items;
       opportunities = nextOpportunities.items;
+      actionProposals = nextProposals.items;
+      auditEvents = nextAudit.items;
       apiError = null;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown Monitor API error';
@@ -75,6 +90,26 @@
       scanError = error instanceof Error ? error.message : 'Unknown scan error';
     } finally {
       scanning = false;
+    }
+  }
+
+  async function handleAction(kind: 'approve' | 'reject' | 'execute', actionId: string) {
+    actionError = null;
+    actionMessage = null;
+    try {
+      if (kind === 'approve') {
+        await approveActionProposal(actionId);
+        actionMessage = `Approved action ${actionId}.`;
+      } else if (kind === 'reject') {
+        await rejectActionProposal(actionId);
+        actionMessage = `Rejected action ${actionId}.`;
+      } else {
+        await executeActionProposal(actionId);
+        actionMessage = `Executed action ${actionId}.`;
+      }
+      await refreshData();
+    } catch (error) {
+      actionError = error instanceof Error ? error.message : 'Unknown action error';
     }
   }
 
@@ -206,13 +241,46 @@
 
     <article class="panel approval-placeholder">
       <p class="eyebrow">Approval Cockpit</p>
-      <h2>Human gate placeholder</h2>
+      <h2>Human gate</h2>
       <p>
-        Qualification and signal-to-opportunity conversion are now live. Draft generation,
-        action proposals, approval decisions, and external execution remain intentionally
-        disabled until the Tailor, audit, and approval APIs are implemented.
+        Draft generation and action proposals are live as local records. Approve/reject decisions
+        are logged; execution calls a configured real executor and fails honestly when none is set.
       </p>
-      <div class="status-pill">No pending approvals loaded</div>
+      {#if actionProposals.length}
+        <div class="item-list compact-list">
+          {#each actionProposals.slice(0, 4) as proposal}
+            <article class="item-card">
+              <div class="item-topline">
+                <span>{proposal.platform}</span>
+                <span>{formatPercent(proposal.match_score)} match</span>
+              </div>
+              <h3>{proposal.action_kind}</h3>
+              <p>{proposal.destination}</p>
+              <div class="chip-row">
+                <span class:risk={proposal.requires_approval}>approval required</span>
+                <span>{proposal.risk_level} risk</span>
+                <span>{formatPercent(proposal.scam_risk_score)} scam risk</span>
+              </div>
+              <div class="action-row">
+                <button type="button" on:click={() => handleAction('approve', proposal.id)}>Approve</button>
+                <button type="button" on:click={() => handleAction('reject', proposal.id)}>Reject</button>
+                <button type="button" on:click={() => handleAction('execute', proposal.id)}>Execute</button>
+              </div>
+            </article>
+          {/each}
+        </div>
+      {:else}
+        <div class="status-pill">No pending proposals loaded</div>
+      {/if}
+      {#if auditEvents.length}
+        <p class="muted source-note">Latest audit event: {auditEvents[0].event_type}</p>
+      {/if}
+      {#if actionMessage}
+        <p class="success">{actionMessage}</p>
+      {/if}
+      {#if actionError}
+        <p class="alert">{actionError}</p>
+      {/if}
     </article>
   </section>
 
@@ -360,9 +428,11 @@
   .item-list { display: grid; gap: 14px; }
   .item-card { border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 20px; background: rgba(8, 7, 14, 0.54); padding: 16px; }
   .item-card p { color: #bdb4d7; line-height: 1.55; }
-  .item-topline, .chip-row, .score-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+  .item-topline, .chip-row, .score-row, .action-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
   .item-topline { color: #a7a2b8; font-size: 0.78rem; margin-bottom: 10px; text-transform: uppercase; }
   .chip-row, .score-row { justify-content: flex-start; }
+  .action-row { justify-content: flex-start; margin-top: 12px; }
+  .action-row button { min-height: 36px; font-size: 0.82rem; }
   .chip-row span.risk { border-color: rgba(251, 113, 133, 0.5); color: #fecdd3; }
   .empty { color: #a7a2b8; border: 1px dashed rgba(168, 85, 247, 0.28); border-radius: 18px; padding: 18px; }
   .source-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }

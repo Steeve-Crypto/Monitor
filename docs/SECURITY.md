@@ -32,6 +32,7 @@ The operator’s credentials, professional identity, and decision authority neve
 ## 5. Risk-Based Human-in-the-Loop Controls
 - Every reputation-risk action requires explicit approval in the Command Deck by default.
 - Reputation-risk actions include submissions, proposals, bids, DMs/emails, account/profile modification, credential use, uploads, and platform interactions classified medium/high risk.
+- Current execution baseline enforces approval before execution and requires a configured real executor adapter. If no executor is configured, the API returns 503 and does not simulate or pretend to send.
 - Low-risk local operations — public discovery, X/Discord monitoring where authorized, normalization, dedupe, local ranking, qualification, drafting, simulation, metrics, and reflection — can execute without approval.
 - Scoped autopilot policies may authorize automated sends/submissions only with explicit limits: platform/account/channel whitelist, template family, max sends/day, cooldowns, max bid/budget, required match score, scam-risk ceiling, and kill switch.
 - Operator can review full proposed reputation-risk action (what will be sent, to where, as whom, with which credentials/profile data) before approval or before enabling an autopilot policy.

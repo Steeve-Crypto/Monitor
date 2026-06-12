@@ -2,7 +2,7 @@
 
 **Status**: Living document. Mirror or import into Linear/Kanban tool as needed.  
 **Last Updated**: 2026-06-12  
-**Current Phase**: Phase 2 — Signal Discovery, Qualification & Command Deck Wiring
+**Current Phase**: Phase 3 — Tailor, Approval, Audit & External Execution Baseline
 
 All tasks use the prefix **MON-** (Monitor).  
 Format: `[MON-XXX] Task title` — Status — Priority — Dependencies — Notes
@@ -44,10 +44,10 @@ Use this document as the working task list. Update status as work progresses. Re
 
 ## Phase 3: Tailoring, Risk-Based Approval Cockpit, Scoped Autopilot & Execution
 
-- [MON-020] Develop Hermes Tailor Skill for customized Upwork proposals, Fiverr replies, X DMs/replies, Discord DMs/messages, crypto board applications, and email outreach — **To Do** — P2 — Depends on MON-011, MON-012
-- [MON-021] Design and implement full-stack Approval Cockpit (payload preview, destination, identity, risk scoring, approve/edit/reject/defer, policy decision) — **To Do** — P2 — Depends on MON-020
-- [MON-022] Create Hermes Executor Skill with Risk, Approval & Autopilot Policy Service gate — **To Do** — P2 — Depends on MON-021
-- [MON-023] Implement immutable audit logging, action proposals, approval decisions, autopilot policy decisions, payload hashes, model provenance, and submission/outreach history — **To Do** — P2
+- [MON-020] Develop Hermes Tailor Skill for customized Upwork proposals, Fiverr replies, X DMs/replies, Discord DMs/messages, crypto board applications, and email outreach — **Partially Done** — P2 — Depends on MON-011, MON-012 — Deterministic local Tailor draft endpoint implemented with payload hashes and local model provenance; Hermes/local LLM and platform-specific templates remain pending
+- [MON-021] Design and implement full-stack Approval Cockpit (payload preview, destination, identity, risk scoring, approve/edit/reject/defer, policy decision) — **Partially Done** — P2 — Depends on MON-020 — Backend action proposal, approval/reject decision APIs, and desktop proposal list are implemented; edit/defer controls and richer payload preview UI remain pending
+- [MON-022] Create Hermes Executor Skill with Risk, Approval & Autopilot Policy Service gate — **Partially Done** — P2 — Depends on MON-021 — Approval-gated execution endpoint and webhook executor adapter baseline implemented; platform-specific X/Discord/marketplace/email/browser executors remain pending
+- [MON-023] Implement immutable audit logging, action proposals, approval decisions, autopilot policy decisions, payload hashes, model provenance, and submission/outreach history — **Partially Done** — P2 — Local audit event baseline records drafts, proposals, approval/rejection decisions, and executions; query/filter/export hardening remains pending
 - [MON-024] Implement scoped AutopilotPolicy model and controls (platform whitelist, template family, max sends/day, cooldowns, max bid/budget, match threshold, scam-risk ceiling, kill switch) — **To Do** — P2 — Depends on MON-006, MON-021
 - [MON-025] Implement local LLM/Grok routing for qualification and proposal drafting with privacy guards — **To Do** — P2 — Depends on MON-005, MON-020
 

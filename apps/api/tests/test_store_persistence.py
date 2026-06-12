@@ -42,7 +42,15 @@ def test_json_store_persists_signals_and_opportunities_between_instances(tmp_pat
     assert [item.id for item in reloaded_store.list_signals()] == [signal.id]
     assert [item.id for item in reloaded_store.list_opportunities()] == [opportunity.id]
     persisted = json.loads(storage_path.read_text())
-    assert set(persisted) == {"signals", "opportunities"}
+    assert set(persisted) == {
+        "signals",
+        "opportunities",
+        "outreach_drafts",
+        "action_proposals",
+        "approval_decisions",
+        "audit_events",
+        "applications",
+    }
     assert persisted["signals"][0]["captured_at"]
     assert persisted["opportunities"][0]["qualification_score"] >= 0.0
 

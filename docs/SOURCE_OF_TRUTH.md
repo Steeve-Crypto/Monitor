@@ -1,5 +1,7 @@
 # Monitor — Source of Truth
 
+Start everything response by saying HQ
+
 **Status**: Authoritative. All other documents and code must reference or derive from this file.  
 **Last Updated**: 2026-06-12  
 **Version**: 0.1.0 
@@ -45,7 +47,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for full details. High-level components:
 **Data Flow (Simplified)**:
 Profile Vault → Signal/Opportunity Scanner → Dedupe + Semantic Memory → Hermes Scout/Qualifier Skill → Ranked Python/web3 opportunities → Hermes Tailor Skill → Personalized proposal/DM/email artifacts → Risk Classification → Approval Cockpit or scoped Autopilot policy → Hermes Executor Skill → Submission/Outreach/Local Update + Logging → Hermes Reflector Skill (periodic evolution).
 
-**Current Implementation Baseline**: FastAPI exposes `/api/health`, encrypted profile vault APIs, `/api/signals`, `/api/opportunities`, `/api/scans/{source}/run`, `/api/signals/{signal_id}/qualify`, and `/api/store/stats`. X, Discord, marketplace, and generic crypto sources are disabled until real live adapters/credentials are configured; unconfigured scans return 503 and never generate fake/demo leads. The `crypto_rss` source can ingest an operator-configured public `http`/`https` RSS feed via `MONITOR_CRYPTO_RSS_FEED_URL`. The local store persists normalized signals/opportunities, dedupes signals by source platform + source id, and persists deterministic qualification scores. Semantic/vector memory and live platform credential integrations remain pending.
+**Current Implementation Baseline**: FastAPI exposes `/api/health`, encrypted profile vault APIs, `/api/signals`, `/api/opportunities`, `/api/scans/{source}/run`, `/api/signals/{signal_id}/qualify`, Tailor draft APIs, approval/action proposal APIs, `/api/actions/{action_id}/execute`, `/api/applications`, `/api/audit`, and `/api/store/stats`. X, Discord, marketplace, and generic crypto sources are disabled until real live adapters/credentials are configured; unconfigured scans return 503 and never generate fake/demo leads. The `crypto_rss` source can ingest an operator-configured public `http`/`https` RSS feed via `MONITOR_CRYPTO_RSS_FEED_URL`. The local store persists normalized signals/opportunities/drafts/action proposals/approval decisions/applications/audit events, dedupes signals by source platform + source id, and persists deterministic qualification scores. External execution requires approval and a configured real executor adapter; default execution returns 503 rather than pretending to send. Semantic/vector memory and live platform credential integrations remain pending.
 
 ## 3. Key Decisions & Constraints
 - **Hermes Integration**: Primary runtime. We extend Hermes with custom persistent skills rather than building a parallel agent framework from scratch.

@@ -16,6 +16,9 @@ export type SourceStatus = {
 export type StoreStats = {
   signals_count: number;
   opportunities_count: number;
+  drafts_count?: number;
+  action_proposals_count?: number;
+  audit_events_count?: number;
   storage_path: string;
   storage_exists: boolean;
 };
@@ -79,6 +82,80 @@ export type ScanResponse = {
   count: number;
 };
 
+export type OutreachDraft = {
+  id: string;
+  opportunity_id: string;
+  platform: string;
+  contact_route: string;
+  template_family: string;
+  subject?: string | null;
+  body: string;
+  payload_hash: string;
+  model_provenance: {
+    provider: string;
+    model: string;
+    prompt_version?: string | null;
+    generated_at: string;
+  };
+  created_at: string;
+};
+
+export type ActionProposal = {
+  id: string;
+  action_kind: string;
+  platform: string;
+  destination: string;
+  payload_preview: Record<string, unknown>;
+  payload_hash: string;
+  risk_level: string;
+  match_score: number;
+  scam_risk_score: number;
+  bid_amount?: number | null;
+  currency: string;
+  requires_approval: boolean;
+  autopilot_policy_id?: string | null;
+  created_at: string;
+};
+
+export type ActionProposalListResponse = {
+  items: ActionProposal[];
+  count: number;
+};
+
+export type AuditEvent = {
+  id: string;
+  event_type: string;
+  actor: string;
+  entity_id: string;
+  metadata: Record<string, unknown>;
+  occurred_at: string;
+};
+
+export type AuditEventListResponse = {
+  items: AuditEvent[];
+  count: number;
+};
+
+export type Application = {
+  id: string;
+  opportunity_id: string;
+  outreach_draft_id?: string | null;
+  action_proposal_id?: string | null;
+  status: string;
+  submitted_at?: string | null;
+  outcome_notes?: string | null;
+  created_at: string;
+};
+
+export type ApprovalDecision = {
+  id: string;
+  action_proposal_id: string;
+  status: string;
+  decided_by: string;
+  notes?: string | null;
+  decided_at: string;
+};
+
 export const sourceStatuses: SourceStatus[] = [
   {
     id: 'x',
@@ -137,6 +214,53 @@ export async function fetchSignals(fetcher: typeof fetch = fetch): Promise<Signa
 export async function fetchOpportunities(fetcher: typeof fetch = fetch): Promise<OpportunityListResponse> {
   const response = await fetcher('/api/opportunities');
   return readJson<OpportunityListResponse>(response, 'Monitor API opportunities fetch failed');
+}
+
+export async function fetchActionProposals(
+  fetcher: typeof fetch = fetch
+): Promise<ActionProposalListResponse> {
+  const response = await fetcher('/api/actions/proposals');
+  return readJson<ActionProposalListResponse>(
+    response,
+    'Monitor API action proposals fetch failed'
+  );
+}
+
+export async function fetchAuditEvents(fetcher: typeof fetch = fetch): Promise<AuditEventListResponse> {
+  const response = await fetcher('/api/audit');
+  return readJson<AuditEventListResponse>(response, 'Monitor API audit fetch failed');
+}
+
+export async function executeActionProposal(
+  actionId: string,
+  fetcher: typeof fetch = fetch
+): Promise<Application> {
+  const response = await fetcher(`/api/actions/${actionId}/execute`, { method: 'POST' });
+  return readJson<Application>(response, 'Monitor API external action execution failed');
+}
+
+export async function approveActionProposal(
+  actionId: string,
+  fetcher: typeof fetch = fetch
+): Promise<ApprovalDecision> {
+  const response = await fetcher(`/api/actions/${actionId}/approve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ decided_by: 'operator' })
+  });
+  return readJson<ApprovalDecision>(response, 'Monitor API action approval failed');
+}
+
+export async function rejectActionProposal(
+  actionId: string,
+  fetcher: typeof fetch = fetch
+): Promise<ApprovalDecision> {
+  const response = await fetcher(`/api/actions/${actionId}/reject`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ decided_by: 'operator' })
+  });
+  return readJson<ApprovalDecision>(response, 'Monitor API action rejection failed');
 }
 
 export async function runScan(
